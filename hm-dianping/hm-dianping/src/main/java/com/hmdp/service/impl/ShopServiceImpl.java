@@ -9,6 +9,7 @@ import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisData;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -35,17 +36,23 @@ import static com.hmdp.utils.RedisConstants.*;
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private CacheClient cacheClient;
     private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
 
     @Override
     public Result queryById(Long id) {
         //  缓存穿透
-        //  Shop shop = queryWithPassThrough(id);
+//        Shop shop = cacheClient.queryWithPassThrough(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
+        //  互斥锁解决缓存击穿
+//        Shop shop = cacheClient.queryWithMutex(CACHE_SHOP_KEY,id,Shop.class,this::getById,CACHE_SHOP_TTL, TimeUnit.MINUTES;
+        //  逻辑过期解决缓存击穿);
 
         //互斥锁解决缓存击穿
 //        Shop shop = queryWithPassMutex(id);
         //逻辑过期解决缓存击穿
-        Shop shop = queryWithLogicalExpire(id);
+        Shop shop = cacheClient.queryWithLogicalExpire(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
+
         if (shop == null) {
             return Result.fail("店铺不存在");
         }
@@ -54,6 +61,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return Result.ok(shop);
     }
 
+/*
     public Shop queryWithLogicalExpire(Long id) {
         String key = CACHE_SHOP_KEY + id;
         // 1.从redis查询商铺缓存
@@ -138,8 +146,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 8.返回
         return shop;
     }
+*/
 
-    public Shop queryWithPassThrough(Long id) {
+/*    public Shop queryWithPassThrough(Long id) {
         String key = CACHE_SHOP_KEY + id;
         // 1.从redis查询商铺缓存
         String shopJson = stringRedisTemplate.opsForValue().get(key);
@@ -165,7 +174,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop), CACHE_SHOP_TTL, TimeUnit.MINUTES);
         // 7.返回
         return shop;
-    }
+    }*/
 
 
     @Override
@@ -183,6 +192,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }
 
 
+/*
     private boolean tryLock(String key) {
         Boolean absent = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", 10, TimeUnit.SECONDS);
         return BooleanUtil.isTrue(absent);
@@ -203,5 +213,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 3.写入redis
         stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id, JSONUtil.toJsonStr(redisData));
     }
+*/
 
 }
